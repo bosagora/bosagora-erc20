@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
 //
-// BOSAGORA is a standard ERC20 token.
-//
 // Copyright (c) 2019 BOS Platform Foundation
+//
+// https://github.com/bpfkorea/bosagora-erc20
 //
 
 import "../openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
