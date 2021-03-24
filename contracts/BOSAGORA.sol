@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
 //
-// Copyright (c) 2019 BOS Platform Foundation
+// Copyright (c) 2019-2021 BOSAGORA Foundation
 //
-// https://github.com/bpfkorea/bosagora-erc20
+// https://github.com/bosagora/bosagora-erc20
 //
 
 import "../openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
