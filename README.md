@@ -9,5 +9,6 @@ This is generated in a 1:1 ratio on the Binance smart chain by peg the ETH netwo
 
 Issue by BOSAGORA Foundation
 
-Reference source link
-https://github.com/binance-chain/bsc-genesis-contract/blob/3b1ed714e189a8fa4b482211f0a07053517b0dde/contracts/bep20_template/BEP20Token.template
+Pegged ERC20 BOAs Address(Ethereum mainnet) : [0x4327bb17a6408d8ff94c7be88c20c521ad85d6d7](https://etherscan.io/token/0x746dda2ea243400d5a63e0700f190ab79f06489e?a=0x4327bb17a6408d8ff94c7be88c20c521ad85d6d7)
+
+BSC BEP20 BOAs Address(Binance smart chain): [0xcbc919d845f393aa0ced76085fd082c8adce00be](https://bscscan.com/token/0xcbc919d845f393aa0ced76085fd082c8adce00be)
