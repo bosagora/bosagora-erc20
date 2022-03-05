@@ -6,8 +6,8 @@ pragma solidity ^0.5.0;
 // https://github.com/bosagora/bosagora-erc20
 //
 
-import "../openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import "../openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
+import "./openzeppelin-v2.3.0/contracts/token/ERC20/ERC20.sol";
+import "./openzeppelin-v2.3.0/contracts/token/ERC20/ERC20Detailed.sol";
 
 contract BOSAGORA is ERC20, ERC20Detailed {
     uint8 public constant DECIMALS = 7;
