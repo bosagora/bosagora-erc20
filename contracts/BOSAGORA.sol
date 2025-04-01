@@ -68,7 +68,7 @@ contract BOSAGORA is ERC20 {
     /**
      * @dev Returns the address of the current owner.
      */
-    function getOwner() external view returns (address) {
+    function owner() external view returns (address) {
         return _owner;
     }
 
