@@ -26,7 +26,7 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     IERC20 public immutable newToken;
 
     /// @dev The MultiSig wallet that owns the contract
-    address private _owner;
+    address internal _owner;
 
     /**
      * @notice Emitted when old tokens are burned

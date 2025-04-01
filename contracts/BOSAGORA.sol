@@ -28,7 +28,7 @@ contract BOSAGORA is ERC20 {
     /*
      *  Storage
      */
-    address private _owner; // Address of the MultiSig wallet that owns the contract
+    address internal _owner; // Address of the MultiSig wallet that owns the contract
 
     /*
      *  Events
