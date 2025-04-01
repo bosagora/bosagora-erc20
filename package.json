@@ -16,7 +16,8 @@
         "lint-fix": "tslint --fix --config tslint.json \\\"{src,test}/**/*.ts\\\"",
         "formatting:check": "prettier '**/*.{json,sol,ts,js,md}' -c",
         "formatting:write": "prettier '**/*.{json,sol,ts,js,md}' --write",
-        "test:BOSAGORA": "hardhat test test/BOSAGORA.test.ts"
+        "test:BOSAGORA": "hardhat test test/BOSAGORA.test.ts",
+        "test:TokenSwap": "hardhat test test/TokenSwap.test.ts"
     },
     "repository": {
         "type": "git",
