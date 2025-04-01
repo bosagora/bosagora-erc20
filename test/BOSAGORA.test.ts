@@ -119,7 +119,7 @@ describe("Test for BOSAGORA token", () => {
 
         token = await deployToken(deployer, multiSigWallet1.address);
 
-        assert.deepStrictEqual(await token.getOwner(), multiSigWallet1.address);
+        assert.deepStrictEqual(await token.owner(), multiSigWallet1.address);
         assert.deepStrictEqual(await token.balanceOf(multiSigWallet1.address), BigNumber.from(0));
         assert.deepStrictEqual(await token.name(), "BOSAGORA");
         assert.deepStrictEqual(await token.symbol(), "BOA");
@@ -275,7 +275,7 @@ describe("Test for BOSAGORA token", () => {
         assert.deepStrictEqual(transactionId, executedTransactionId);
 
         // Check new owner
-        assert.deepStrictEqual(await token.getOwner(), multiSigWallet2.address);
+        assert.deepStrictEqual(await token.owner(), multiSigWallet2.address);
 
         // Verify old owner cannot mint
         const currentSupply = await token.totalSupply();

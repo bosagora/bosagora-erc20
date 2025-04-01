@@ -4,6 +4,7 @@ pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
@@ -14,7 +15,7 @@ import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
  * @notice This contract allows users to swap their old tokens for new tokens at a 1:1 ratio
  * @author BOSAGORA Foundation
  */
-contract TokenSwap is Pausable {
+contract TokenSwap is Pausable, ReentrancyGuard {
     /// @dev The address where old tokens will be burned
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
@@ -157,7 +158,7 @@ contract TokenSwap is Pausable {
      * If any step fails, the transaction will be reverted and old tokens returned
      * @param amount The amount of tokens to swap
      */
-    function swap(uint256 amount) external whenNotPaused {
+    function swap(uint256 amount) external whenNotPaused nonReentrant {
         // Gas optimization: Check zero amount first (cheap check)
         require(amount > 0, "TokenSwap: Amount must be greater than 0");
 
@@ -203,7 +204,7 @@ contract TokenSwap is Pausable {
      * @param amount The amount of tokens to rescue
      * @param to The address to send the rescued tokens to
      */
-    function rescueTokens(address token, uint256 amount, address to) external onlyOwner {
+    function rescueTokens(address token, uint256 amount, address to) external onlyOwner nonReentrant {
         require(token != address(0), "TokenSwap: Token address is zero");
         require(to != address(0), "TokenSwap: Recipient address is zero");
         require(amount > 0, "TokenSwap: Amount must be greater than 0");
