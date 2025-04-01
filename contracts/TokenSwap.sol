@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
 
 /**
  * @title TokenSwap
@@ -13,15 +14,18 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
  * @notice This contract allows users to swap their old tokens for new tokens at a 1:1 ratio
  * @author BOSAGORA Foundation
  */
-contract TokenSwap is Pausable, Ownable {
-    /// @notice The address where old tokens will be burned
+contract TokenSwap is Pausable {
+    /// @dev The address where old tokens will be burned
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    /// @notice The old token contract
+    /// @dev The old token contract
     IERC20 public immutable oldToken;
 
-    /// @notice The new token contract
+    /// @dev The new token contract
     IERC20 public immutable newToken;
+
+    /// @dev The MultiSig wallet that owns the contract
+    address private _owner;
 
     /**
      * @notice Emitted when old tokens are burned
@@ -38,14 +42,31 @@ contract TokenSwap is Pausable, Ownable {
     event TokenSwapped(address indexed user, uint256 amount);
 
     /**
+     * @notice Emitted when ownership is transferred
+     * @param previousOwner The address of the previous owner
+     * @param newOwner The address of the new owner
+     */
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyOwner() {
+        require(msg.sender == _owner, "TokenSwap: Only the owner can execute");
+        _;
+    }
+
+    /**
      * @notice Contract constructor
      * @param _oldToken Address of the old token contract
      * @param _newToken Address of the new token contract
+     * @param owner_ Address of the MultiSig wallet that will own the contract
      * @dev Validates token contracts and checks decimals compatibility
      */
-    constructor(address _oldToken, address _newToken) {
+    constructor(address _oldToken, address _newToken, address owner_) {
         require(_oldToken != address(0), "TokenSwap: Old token is zero address");
         require(_newToken != address(0), "TokenSwap: New token is zero address");
+        require(owner_ != address(0), "TokenSwap: Owner is zero address");
 
         // Initialize token contracts
         oldToken = IERC20(_oldToken);
@@ -54,6 +75,13 @@ contract TokenSwap is Pausable, Ownable {
         // Validate that the contracts actually exist and implement ERC20
         require(isContract(_oldToken), "TokenSwap: Old token address is not a contract");
         require(isContract(_newToken), "TokenSwap: New token address is not a contract");
+
+        // Validate owner is a MultiSig wallet
+        require(
+            IMultiSigWallet(owner_).supportsInterface(type(IMultiSigWallet).interfaceId),
+            "TokenSwap: Invalid interface ID of multi sig wallet"
+        );
+        _owner = owner_;
 
         // Check token decimals compatibility
         try IERC20Metadata(_oldToken).decimals() returns (uint8 oldDecimals) {
@@ -65,6 +93,30 @@ contract TokenSwap is Pausable, Ownable {
         } catch {
             revert("TokenSwap: Old token does not implement decimals");
         }
+    }
+
+    /**
+     * @dev Returns the address of the current owner.
+     */
+    function owner() public view returns (address) {
+        return _owner;
+    }
+
+    /**
+     * @notice Transfers ownership of the contract to a new MultiSig wallet
+     * @param newOwner The address of the new MultiSig wallet owner
+     * @dev Only callable by the current owner
+     */
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "TokenSwap: New owner is zero address");
+        require(
+            IMultiSigWallet(newOwner).supportsInterface(type(IMultiSigWallet).interfaceId),
+            "TokenSwap: Invalid interface ID of new multi sig wallet"
+        );
+
+        address previousOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(previousOwner, newOwner);
     }
 
     /**
@@ -155,9 +207,6 @@ contract TokenSwap is Pausable, Ownable {
         require(token != address(0), "TokenSwap: Token address is zero");
         require(to != address(0), "TokenSwap: Recipient address is zero");
         require(amount > 0, "TokenSwap: Amount must be greater than 0");
-
-        // Prevent rescue of tokens involved in the swap
-        require(token != address(oldToken) && token != address(newToken), "TokenSwap: Cannot rescue swap tokens");
 
         IERC20 tokenContract = IERC20(token);
         require(tokenContract.balanceOf(address(this)) >= amount, "TokenSwap: Insufficient token balance");
