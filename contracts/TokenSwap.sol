@@ -26,7 +26,7 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     IERC20 public immutable newToken;
 
     /// @dev The MultiSig wallet that owns the contract
-    address internal _owner;
+    address public owner;
 
     /**
      * @notice Emitted when old tokens are burned
@@ -53,40 +53,40 @@ contract TokenSwap is Pausable, ReentrancyGuard {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == _owner, "TokenSwap: Only the owner can execute");
+        require(msg.sender == owner, "TokenSwap: Only the owner can execute");
         _;
     }
 
     /**
      * @notice Contract constructor
-     * @param _oldToken Address of the old token contract
-     * @param _newToken Address of the new token contract
-     * @param owner_ Address of the MultiSig wallet that will own the contract
+     * @param oldTokenAddress Address of the old token contract
+     * @param newTokenAddress Address of the new token contract
+     * @param multisigWallet Address of the MultiSig wallet that will own the contract
      * @dev Validates token contracts and checks decimals compatibility
      */
-    constructor(address _oldToken, address _newToken, address owner_) {
-        require(_oldToken != address(0), "TokenSwap: Old token is zero address");
-        require(_newToken != address(0), "TokenSwap: New token is zero address");
-        require(owner_ != address(0), "TokenSwap: Owner is zero address");
+    constructor(address oldTokenAddress, address newTokenAddress, address multisigWallet) {
+        require(oldTokenAddress != address(0), "TokenSwap: Old token is zero address");
+        require(newTokenAddress != address(0), "TokenSwap: New token is zero address");
+        require(multisigWallet != address(0), "TokenSwap: Owner is zero address");
 
         // Initialize token contracts
-        oldToken = IERC20(_oldToken);
-        newToken = IERC20(_newToken);
+        oldToken = IERC20(oldTokenAddress);
+        newToken = IERC20(newTokenAddress);
 
         // Validate that the contracts actually exist and implement ERC20
-        require(isContract(_oldToken), "TokenSwap: Old token address is not a contract");
-        require(isContract(_newToken), "TokenSwap: New token address is not a contract");
+        require(isContract(oldTokenAddress), "TokenSwap: Old token address is not a contract");
+        require(isContract(newTokenAddress), "TokenSwap: New token address is not a contract");
 
         // Validate owner is a MultiSig wallet
         require(
-            IMultiSigWallet(owner_).supportsInterface(type(IMultiSigWallet).interfaceId),
+            IMultiSigWallet(multisigWallet).supportsInterface(type(IMultiSigWallet).interfaceId),
             "TokenSwap: Invalid interface ID of multi sig wallet"
         );
-        _owner = owner_;
+        owner = multisigWallet;
 
         // Check token decimals compatibility
-        try IERC20Metadata(_oldToken).decimals() returns (uint8 oldDecimals) {
-            try IERC20Metadata(_newToken).decimals() returns (uint8 newDecimals) {
+        try IERC20Metadata(oldTokenAddress).decimals() returns (uint8 oldDecimals) {
+            try IERC20Metadata(newTokenAddress).decimals() returns (uint8 newDecimals) {
                 require(oldDecimals == newDecimals, "TokenSwap: Token decimals mismatch");
             } catch {
                 revert("TokenSwap: New token does not implement decimals");
@@ -94,13 +94,6 @@ contract TokenSwap is Pausable, ReentrancyGuard {
         } catch {
             revert("TokenSwap: Old token does not implement decimals");
         }
-    }
-
-    /**
-     * @dev Returns the address of the current owner.
-     */
-    function owner() public view returns (address) {
-        return _owner;
     }
 
     /**
@@ -115,8 +108,8 @@ contract TokenSwap is Pausable, ReentrancyGuard {
             "TokenSwap: Invalid interface ID of new multi sig wallet"
         );
 
-        address previousOwner = _owner;
-        _owner = newOwner;
+        address previousOwner = owner;
+        owner = newOwner;
         emit OwnershipTransferred(previousOwner, newOwner);
     }
 

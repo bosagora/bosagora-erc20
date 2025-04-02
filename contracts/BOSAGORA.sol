@@ -28,7 +28,7 @@ contract BOSAGORA is ERC20 {
     /*
      *  Storage
      */
-    address internal _owner; // Address of the MultiSig wallet that owns the contract
+    address public owner; // Address of the MultiSig wallet that owns the contract
 
     /*
      *  Events
@@ -43,7 +43,7 @@ contract BOSAGORA is ERC20 {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == _owner, "BOSAGORA: Only the owner can execute");
+        require(msg.sender == owner, "BOSAGORA: Only the owner can execute");
         _;
     }
 
@@ -52,24 +52,17 @@ contract BOSAGORA is ERC20 {
      */
     /**
      * @dev Initializes the contract with a MultiSig wallet as the owner.
-     * @param account_ The address of the MultiSig wallet that will own the contract.
+     * @param multisigWallet The address of the MultiSig wallet that will own the contract.
      *
      * Requirements:
      * - The account must be a valid MultiSig wallet contract
      */
-    constructor(address account_) ERC20(NAME, SYMBOL) {
-        _owner = account_;
+    constructor(address multisigWallet) ERC20(NAME, SYMBOL) {
+        owner = multisigWallet;
         require(
-            IMultiSigWallet(_owner).supportsInterface(type(IMultiSigWallet).interfaceId),
+            IMultiSigWallet(owner).supportsInterface(type(IMultiSigWallet).interfaceId),
             "BOSAGORA: Invalid interface ID of multi sig wallet"
         );
-    }
-
-    /**
-     * @dev Returns the address of the current owner.
-     */
-    function owner() external view returns (address) {
-        return _owner;
     }
 
     /**
@@ -85,13 +78,13 @@ contract BOSAGORA is ERC20 {
      */
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "BOSAGORA: New owner is zero address");
-        require(newOwner != _owner, "BOSAGORA: New owner is same as current owner");
+        require(newOwner != owner, "BOSAGORA: New owner is same as current owner");
         require(
             IMultiSigWallet(newOwner).supportsInterface(type(IMultiSigWallet).interfaceId),
             "BOSAGORA: Invalid interface ID of new multi sig wallet"
         );
-        address previousOwner = _owner;
-        _owner = newOwner;
+        address previousOwner = owner;
+        owner = newOwner;
         emit OwnershipTransferred(previousOwner, newOwner);
     }
 
@@ -108,8 +101,8 @@ contract BOSAGORA is ERC20 {
     function mint(uint256 amount) external onlyOwner {
         require(amount > 0, "BOSAGORA: Amount must be greater than 0");
         require(totalSupply() + amount <= MAX_SUPPLY, "BOSAGORA: Exceeds maximum supply");
-        _mint(_owner, amount);
-        emit TokensMinted(_owner, amount);
+        _mint(owner, amount);
+        emit TokensMinted(owner, amount);
     }
 
     /**
