@@ -15,6 +15,16 @@ function getAccounts() {
     const accounts: string[] = [];
     const reg_bytes64: RegExp = /^(0x)[0-9a-f]{64}$/i;
     if (
+        process.env.DEPLOYER_MULTISIG !== undefined &&
+        process.env.DEPLOYER_MULTISIG.trim() !== "" &&
+        reg_bytes64.test(process.env.DEPLOYER_MULTISIG)
+    ) {
+        accounts.push(process.env.DEPLOYER_MULTISIG);
+    } else {
+        process.env.DEPLOYER_MULTISIG = Wallet.createRandom().privateKey;
+        accounts.push(process.env.DEPLOYER_MULTISIG);
+    }
+    if (
         process.env.DEPLOYER !== undefined &&
         process.env.DEPLOYER.trim() !== "" &&
         reg_bytes64.test(process.env.DEPLOYER)
