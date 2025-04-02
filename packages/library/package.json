@@ -1,0 +1,39 @@
+{
+    "name": "boa-contracts-lib",
+    "version": "1.0.0",
+    "description": "",
+    "main": "dist/bundle-cjs.js",
+    "module": "dist/bundle-esm.js",
+    "types": "dist/bundle.d.ts",
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "clean": "rm -Rf dist && rm -Rf types",
+        "build:contracts": "cd ../contracts && yarn build",
+        "build": "find ../contracts/artifacts/contracts/ -name '*.json' -type f | grep -v '.dbg.json' | xargs typechain --target=ethers-v5 --out-dir ./types",
+        "build:npm": "rollup --config rollup.config.ts"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/bosagora/bosagora-erc20.git"
+    },
+    "author": "BOSagora Foundation",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/bosagora/bosagora-erc20/issues"
+    },
+    "homepage": "https://github.com/bosagora/bosagora-erc20#readme",
+    "devDependencies": {
+        "@rollup/plugin-json": "^4.1.0",
+        "@rollup/plugin-typescript": "^8.3.1",
+        "@typechain/ethers-v5": "^10.1.0",
+        "rollup": "^2.70.1",
+        "rollup-plugin-dts": "^4.2.0",
+        "typechain": "^8.1.0",
+        "typescript": "^4.5.5"
+    },
+    "dependencies": {
+        "ethers": "5.7.0"
+    }
+}
