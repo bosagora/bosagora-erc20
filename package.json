@@ -1,0 +1,17 @@
+{
+  "name": "bosagora-erc20",
+  "version": "1.0.0",
+  "description": "BOSAGORA Token and TokenSwap Contracts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bosagora/bosagora-erc20.git"
+  },
+  "author": "BOSagora Foundation",
+  "license": "MIT",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  }
+}
