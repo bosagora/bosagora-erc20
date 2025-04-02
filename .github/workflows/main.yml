@@ -25,15 +25,15 @@ jobs:
         run: yarn install --pure-lockfile
 
       - name: Copy env
-        run: cp env/.env.sample env/.env
+        run: cd packages/contracts && cp env/.env.sample env/.env
 
       - name: Check formatting
-        run: yarn run formatting:check
+        run: cd packages/contracts && yarn run formatting:check
 
       - name: Compile
-        run: yarn run build
+        run: cd packages/contracts && yarn run build
 
       - name: Run Hardhat Tests
         env:
           REPORT_GAS: true
-        run: yarn run test
+        run: cd packages/contracts && yarn run test
