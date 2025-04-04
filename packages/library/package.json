@@ -1,6 +1,6 @@
 {
     "name": "boa-contracts-lib",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "",
     "main": "dist/bundle-cjs.js",
     "module": "dist/bundle-esm.js",
@@ -11,7 +11,7 @@
     "scripts": {
         "clean": "rm -Rf dist && rm -Rf types",
         "build:contracts": "cd ../contracts && yarn build",
-        "build": "find ../contracts/artifacts/contracts/ -name '*.json' -type f | grep -v '.dbg.json' | xargs typechain --target=ethers-v5 --out-dir ./types",
+        "build": "find ../contracts/artifacts/@openzeppelin/contracts/ ../contracts/artifacts/contracts/ -name '*.json' -type f | grep -v '.dbg.json' | xargs typechain --target=ethers-v5 --out-dir ./types",
         "build:npm": "rollup --config rollup.config.ts"
     },
     "repository": {
