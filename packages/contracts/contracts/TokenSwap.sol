@@ -103,6 +103,7 @@ contract TokenSwap is Pausable, ReentrancyGuard {
      */
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "TokenSwap: New owner is zero address");
+        require(newOwner != owner, "TokenSwap: New owner is the same as current owner");
         require(
             IMultiSigWallet(newOwner).supportsInterface(type(IMultiSigWallet).interfaceId),
             "TokenSwap: Invalid interface ID of new multi sig wallet"
