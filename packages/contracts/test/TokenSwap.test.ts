@@ -162,8 +162,6 @@ describe("TokenSwap (TypeScript)", function () {
         await oldToken.connect(user).approve(tokenSwap.address, amount);
 
         await expect(tokenSwap.connect(user).swap(amount))
-            .to.emit(tokenSwap, "OldTokenBurned")
-            .withArgs(userAddress, amount)
             .and.to.emit(tokenSwap, "TokenSwapped")
             .withArgs(userAddress, amount);
     });

@@ -163,27 +163,16 @@ contract TokenSwap is Pausable, ReentrancyGuard {
         uint256 newTokenBalance = newToken.balanceOf(address(this));
         require(newTokenBalance >= amount, "TokenSwap: Insufficient new token balance");
 
-        // Transfer old token from user
-        bool oldTokenTransferSuccess = oldToken.transferFrom(msg.sender, address(this), amount);
-        if (!oldTokenTransferSuccess) {
-            revert("TokenSwap: Old token transfer failed");
-        }
+        // Transfer old token directly to BURN_ADDRESS
+        bool oldTokenTransferSuccess = oldToken.transferFrom(msg.sender, BURN_ADDRESS, amount);
+        require(oldTokenTransferSuccess, "TokenSwap: Old token transfer failed");
 
-        // Check if new token transfer would succeed before burning
+        // Transfer new token to user
         bool newTokenTransferSuccess = newToken.transfer(msg.sender, amount);
-        if (!newTokenTransferSuccess) {
-            revert("TokenSwap: New token transfer failed");
-        }
-
-        // Only burn old token after confirming new token transfer success
-        bool burnSuccess = oldToken.transfer(BURN_ADDRESS, amount);
-        if (!burnSuccess) {
-            revert("TokenSwap: Burning old token failed");
-        }
+        require(newTokenTransferSuccess, "TokenSwap: New token transfer failed");
 
         // Gas optimization: Emit events at the end in the correct order
-        emit TokenSwapped(msg.sender, amount); // First emit the successful swap
-        emit OldTokenBurned(msg.sender, amount); // Then emit the burning of old tokens
+        emit TokenSwapped(msg.sender, amount); // Emit the successful swap
     }
 
     /**

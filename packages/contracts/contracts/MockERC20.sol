@@ -52,9 +52,12 @@ contract MockERC20 is ERC20 {
      */
     function transfer(address to, uint256 amount) public override returns (bool) {
         if (errorCausing) revert("Error for test");
-        address owner = _msgSender();
-        _transfer(owner, to, amount);
-        return true;
+        return ERC20.transfer(to, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+        if (errorCausing) revert("Error for test");
+        return ERC20.transferFrom(from, to, amount);
     }
 
     /**
