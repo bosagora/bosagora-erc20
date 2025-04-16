@@ -172,16 +172,12 @@ contract TokenSwap is Pausable, ReentrancyGuard {
         // Check if new token transfer would succeed before burning
         bool newTokenTransferSuccess = newToken.transfer(msg.sender, amount);
         if (!newTokenTransferSuccess) {
-            // If new token transfer fails, return old token to user
-            require(oldToken.transfer(msg.sender, amount), "TokenSwap: Failed to return old token");
             revert("TokenSwap: New token transfer failed");
         }
 
         // Only burn old token after confirming new token transfer success
         bool burnSuccess = oldToken.transfer(BURN_ADDRESS, amount);
         if (!burnSuccess) {
-            // If burning fails, return old token to user
-            require(oldToken.transfer(msg.sender, amount), "TokenSwap: Failed to return old token");
             revert("TokenSwap: Burning old token failed");
         }
 
