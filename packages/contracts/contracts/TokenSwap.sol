@@ -61,13 +61,13 @@ contract TokenSwap is Pausable, ReentrancyGuard {
      * @notice Contract constructor
      * @param oldTokenAddress Address of the old token contract
      * @param newTokenAddress Address of the new token contract
-     * @param multisigWallet Address of the MultiSig wallet that will own the contract
+     * @param initialOwner The initial address that will own the contract.
      * @dev Validates token contracts and checks decimals compatibility
      */
-    constructor(address oldTokenAddress, address newTokenAddress, address multisigWallet) {
+    constructor(address oldTokenAddress, address newTokenAddress, address initialOwner) {
         require(oldTokenAddress != address(0), "TokenSwap: Old token is zero address");
         require(newTokenAddress != address(0), "TokenSwap: New token is zero address");
-        require(multisigWallet != address(0), "TokenSwap: Owner is zero address");
+        require(initialOwner != address(0), "TokenSwap: Owner is zero address");
 
         // Initialize token contracts
         oldToken = IERC20(oldTokenAddress);
@@ -77,12 +77,7 @@ contract TokenSwap is Pausable, ReentrancyGuard {
         require(isContract(oldTokenAddress), "TokenSwap: Old token address is not a contract");
         require(isContract(newTokenAddress), "TokenSwap: New token address is not a contract");
 
-        // Validate owner is a MultiSig wallet
-        require(
-            IMultiSigWallet(multisigWallet).supportsInterface(type(IMultiSigWallet).interfaceId),
-            "TokenSwap: Invalid interface ID of multi sig wallet"
-        );
-        owner = multisigWallet;
+        owner = initialOwner;
 
         // Check token decimals compatibility
         try IERC20Metadata(oldTokenAddress).decimals() returns (uint8 oldDecimals) {
@@ -97,17 +92,13 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Transfers ownership of the contract to a new MultiSig wallet
-     * @param newOwner The address of the new MultiSig wallet owner
-     * @dev Only callable by the current owner
+     * @notice Transfers ownership of the contract to a new owner account.
+     * @param newOwner The address of the new owner.
+     * @dev Only callable by the current owner.
      */
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "TokenSwap: New owner is zero address");
         require(newOwner != owner, "TokenSwap: New owner is the same as current owner");
-        require(
-            IMultiSigWallet(newOwner).supportsInterface(type(IMultiSigWallet).interfaceId),
-            "TokenSwap: Invalid interface ID of new multi sig wallet"
-        );
 
         address previousOwner = owner;
         owner = newOwner;

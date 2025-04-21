@@ -51,38 +51,32 @@ contract BOSAGORA is ERC20 {
      * Public functions
      */
     /**
-     * @dev Initializes the contract with a MultiSig wallet as the owner.
-     * @param multisigWallet The address of the MultiSig wallet that will own the contract.
+     * @dev Initializes the contract, setting the deployer as the initial owner.
+     * @param initialOwner The initial address that will own the contract.
      *
      * Requirements:
-     * - The account must be a valid MultiSig wallet contract
+     * - The initial owner cannot be the zero address.
      */
-    constructor(address multisigWallet) ERC20(NAME, SYMBOL) {
-        owner = multisigWallet;
-        require(
-            IMultiSigWallet(owner).supportsInterface(type(IMultiSigWallet).interfaceId),
-            "BOSAGORA: Invalid interface ID of multi sig wallet"
-        );
+    constructor(address initialOwner) ERC20(NAME, SYMBOL) {
+        require(initialOwner != address(0), "BOSAGORA: Initial owner is zero address");
+        owner = initialOwner;
     }
 
     /**
-     * @dev Transfers ownership of the contract to a new MultiSig wallet.
-     * @param newOwner The address of the new MultiSig wallet owner.
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Can only be called by the current owner.
+     * @param newOwner The address of the new owner.
      *
      * Requirements:
-     * - The caller must be the current owner
-     * - The new owner cannot be the zero address
-     * - The new owner must be a valid MultiSig wallet contract
+     * - The caller must be the current owner.
+     * - `newOwner` cannot be the zero address.
+     * - `newOwner` cannot be the current owner.
      *
-     * Emits a {OwnershipTransferred} event.
+     * Emits an {OwnershipTransferred} event.
      */
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "BOSAGORA: New owner is zero address");
         require(newOwner != owner, "BOSAGORA: New owner is same as current owner");
-        require(
-            IMultiSigWallet(newOwner).supportsInterface(type(IMultiSigWallet).interfaceId),
-            "BOSAGORA: Invalid interface ID of new multi sig wallet"
-        );
         address previousOwner = owner;
         owner = newOwner;
         emit OwnershipTransferred(previousOwner, newOwner);

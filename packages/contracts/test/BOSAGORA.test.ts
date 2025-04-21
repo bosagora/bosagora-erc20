@@ -107,13 +107,6 @@ describe("Test for BOSAGORA token", () => {
         assert.deepStrictEqual(await multiSigFactory.getNumberOfWalletsForMember(account5.address), BigNumber.from(1));
     });
 
-    it("Create Token, Owner is wallet", async () => {
-        const factory = await ethers.getContractFactory("BOSAGORA");
-        await expect(factory.connect(deployer).deploy(account0.address)).to.be.revertedWith(
-            "function call to a non-contract account"
-        );
-    });
-
     it("Create Token, Owner is MultiSigWallet", async () => {
         assert.ok(multiSigWallet1);
 
