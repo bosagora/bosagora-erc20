@@ -17,7 +17,8 @@
         "formatting:check": "prettier '**/*.{json,sol,ts,js,md}' -c",
         "formatting:write": "prettier '**/*.{json,sol,ts,js,md}' --write",
         "test:BOSAGORA": "hardhat test test/BOSAGORA.test.ts",
-        "test:TokenSwap": "hardhat test test/TokenSwap.test.ts"
+        "test:TokenSwap": "hardhat test test/TokenSwap.test.ts",
+        "test:TimeLock": "hardhat test test/TimeLock.test.ts"
     },
     "repository": {
         "type": "git",

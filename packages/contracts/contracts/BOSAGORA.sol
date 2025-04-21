@@ -33,7 +33,7 @@ contract BOSAGORA is ERC20 {
     /*
      *  Events
      */
-    event TokensMinted(address indexed to, uint256 amount);
+    event TokensMinted(address indexed account, uint256 amount);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     /*
@@ -83,7 +83,8 @@ contract BOSAGORA is ERC20 {
     }
 
     /**
-     * @dev Mints new tokens to the owner's address.
+     * @dev Mints new tokens to `account`.
+     * @param account The account of tokens to mint.
      * @param amount The amount of tokens to mint.
      *
      * Requirements:
@@ -92,11 +93,11 @@ contract BOSAGORA is ERC20 {
      *
      * Emits a {TokensMinted} event.
      */
-    function mint(uint256 amount) external onlyOwner {
+    function mint(address account, uint256 amount) external onlyOwner {
         require(amount > 0, "BOSAGORA: Amount must be greater than 0");
         require(totalSupply() + amount <= MAX_SUPPLY, "BOSAGORA: Exceeds maximum supply");
-        _mint(owner, amount);
-        emit TokensMinted(owner, amount);
+        _mint(account, amount);
+        emit TokensMinted(account, amount);
     }
 
     /**

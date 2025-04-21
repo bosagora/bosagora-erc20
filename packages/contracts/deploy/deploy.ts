@@ -303,8 +303,8 @@ async function mintInitialSupplyToken(accounts: IAccount, deployment: Deployment
     const contractName = "NewBOAToken";
     const contract = deployment.getContract("NewBOAToken") as BOSAGORA;
     const amount = new BOAToken(totalSupply);
-    const encodedData = contract.interface.encodeFunctionData("mint", [amount.value]);
     const wallet = deployment.getContract("MultiSigWallet") as MultiSigWallet;
+    const encodedData = contract.interface.encodeFunctionData("mint", [wallet.address, amount.value]);
     const transactionId = await ContractUtils.getEventValueBigNumber(
         await wallet
             .connect(accounts.tokenOwners[0])

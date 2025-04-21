@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-waffle";
 import { ethers } from "hardhat";
 
 import { HardhatAccount } from "../src/HardhatAccount";
-import { BOSAGORA, MultiSigWallet, MultiSigWalletFactory } from "../typechain-types";
+import { BOSAGORA, MultiSigWallet, MultiSigWalletFactory, TimelockController } from "../typechain-types";
 import { ContractUtils } from "../src/utils/ContractUtils";
 
 import assert from "assert";
@@ -40,6 +40,22 @@ async function deployMultiSigWallet(
     return address !== undefined
         ? ((await ethers.getContractFactory("MultiSigWallet")).attach(address) as MultiSigWallet)
         : undefined;
+}
+
+async function deployTimeLockController(
+    deployer: Wallet,
+    minDelay: number,
+    proposers: string[],
+    executors: string[],
+    admin: string
+): Promise<TimelockController> {
+    const factory = await ethers.getContractFactory("TimelockController");
+    const contract = (await factory
+        .connect(deployer)
+        .deploy(minDelay, proposers, executors, admin)) as TimelockController;
+    await contract.deployed();
+    await contract.deployTransaction.wait();
+    return contract;
 }
 
 async function deployToken(deployer: Wallet, owner: string): Promise<BOSAGORA> {
@@ -120,8 +136,11 @@ describe("Test for BOSAGORA token", () => {
     });
 
     it("Fail mint initial supply", async () => {
+        assert.ok(multiSigWallet1);
         const amount = BOAToken.make(1).value;
-        await expect(token.connect(account0).mint(amount)).to.be.revertedWith("BOSAGORA: Only the owner can execute");
+        await expect(token.connect(account0).mint(multiSigWallet1.address, amount)).to.be.revertedWith(
+            "BOSAGORA: Only the owner can execute"
+        );
     });
 
     it("mint initial supply", async () => {
@@ -130,7 +149,7 @@ describe("Test for BOSAGORA token", () => {
 
         const initialSupply = BOAToken.make(100_000_000).value;
 
-        const mintEncoded = token.interface.encodeFunctionData("mint", [initialSupply]);
+        const mintEncoded = token.interface.encodeFunctionData("mint", [multiSigWallet1.address, initialSupply]);
 
         const transactionId = await ContractUtils.getEventValueBigNumber(
             await multiSigWallet1
@@ -209,7 +228,7 @@ describe("Test for BOSAGORA token", () => {
         const maxSupply = await token.MAX_SUPPLY();
         const currentSupply = await token.totalSupply();
         const newSupply = maxSupply.sub(currentSupply).add(1);
-        const mintEncoded = token.interface.encodeFunctionData("mint", [newSupply]);
+        const mintEncoded = token.interface.encodeFunctionData("mint", [multiSigWallet1.address, newSupply]);
 
         const transactionId = await ContractUtils.getEventValueBigNumber(
             await multiSigWallet1
@@ -272,7 +291,10 @@ describe("Test for BOSAGORA token", () => {
 
         // Verify old owner cannot mint
         const currentSupply = await token.totalSupply();
-        const mintEncoded = token.interface.encodeFunctionData("mint", [BOAToken.make(1).value]);
+        const mintEncoded = token.interface.encodeFunctionData("mint", [
+            multiSigWallet1.address,
+            BOAToken.make(1).value,
+        ]);
         const newMintTransaction1Id = await ContractUtils.getEventValueBigNumber(
             await multiSigWallet1
                 .connect(account0)
@@ -324,7 +346,7 @@ describe("Test for BOSAGORA token", () => {
 
         // Test TokensMinted event
         const mintAmount = BOAToken.make(100).value;
-        const mintEncoded = token.interface.encodeFunctionData("mint", [mintAmount]);
+        const mintEncoded = token.interface.encodeFunctionData("mint", [multiSigWallet2.address, mintAmount]);
 
         const transactionId = await ContractUtils.getEventValueBigNumber(
             await multiSigWallet2
@@ -344,7 +366,7 @@ describe("Test for BOSAGORA token", () => {
         const events = await token.queryFilter(filter, latestBlock.number - 1, latestBlock.number);
 
         assert.deepStrictEqual(events.length, 1);
-        assert.deepStrictEqual(events[0].args?.to, multiSigWallet2.address);
+        assert.deepStrictEqual(events[0].args?.account, multiSigWallet2.address);
         assert.deepStrictEqual(events[0].args?.amount, mintAmount);
 
         const transferEncoded = token.interface.encodeFunctionData("transferOwnership", [multiSigWallet1.address]);
@@ -389,7 +411,7 @@ describe("Test for BOSAGORA token", () => {
         const maxSupply = await token.MAX_SUPPLY();
         const currentSupply = await token.totalSupply();
         const newSupply = maxSupply.sub(currentSupply);
-        const mintEncoded = token.interface.encodeFunctionData("mint", [newSupply]);
+        const mintEncoded = token.interface.encodeFunctionData("mint", [multiSigWallet1.address, newSupply]);
 
         const transactionId = await ContractUtils.getEventValueBigNumber(
             await multiSigWallet1
@@ -411,5 +433,158 @@ describe("Test for BOSAGORA token", () => {
         // Check that transaction has been executed
         assert.deepStrictEqual(executedTransactionId, transactionId);
         assert.deepStrictEqual(await token.totalSupply(), maxSupply);
+    });
+});
+
+describe("Test for BOSAGORA token, Using TimeLockController", () => {
+    const raws = HardhatAccount.keys.map((m) => new Wallet(m, ethers.provider));
+    const [deployer, account0, account1, account2, account3, account4, account5, account6] = raws;
+    const owners1 = [account0, account1, account2];
+
+    let multiSigFactory: MultiSigWalletFactory;
+    let multiSigWallet1: MultiSigWallet | undefined;
+    let timeLock: TimelockController;
+    let token: BOSAGORA;
+    const requiredConfirmations = 2;
+    const minDelay = 48 * 60 * 60;
+
+    before(async () => {
+        multiSigFactory = await deployMultiSigWalletFactory(deployer);
+        assert.ok(multiSigFactory);
+    });
+
+    it("Create Wallet by Factory", async () => {
+        multiSigWallet1 = await deployMultiSigWallet(
+            multiSigFactory.address,
+            deployer,
+            owners1.map((m) => m.address),
+            requiredConfirmations,
+            BigNumber.from(1)
+        );
+        assert.ok(multiSigWallet1);
+
+        assert.deepStrictEqual(
+            await multiSigWallet1.getMembers(),
+            owners1.map((m) => m.address)
+        );
+
+        assert.deepStrictEqual(await multiSigFactory.getNumberOfWalletsForMember(account0.address), BigNumber.from(1));
+        assert.deepStrictEqual(await multiSigFactory.getNumberOfWalletsForMember(account1.address), BigNumber.from(1));
+        assert.deepStrictEqual(await multiSigFactory.getNumberOfWalletsForMember(account2.address), BigNumber.from(1));
+    });
+
+    it("Create TimeLockController", async () => {
+        assert.ok(multiSigWallet1);
+        const proposers = [multiSigWallet1.address];
+        const executors = [multiSigWallet1.address];
+        const admin = multiSigWallet1.address;
+        timeLock = await deployTimeLockController(deployer, minDelay, proposers, executors, admin);
+    });
+
+    it("Create Token, Owner is MultiSigWallet", async () => {
+        assert.ok(multiSigWallet1);
+        assert.ok(timeLock);
+
+        token = await deployToken(deployer, timeLock.address);
+
+        assert.deepStrictEqual(await token.owner(), timeLock.address);
+        assert.deepStrictEqual(await token.balanceOf(multiSigWallet1.address), BigNumber.from(0));
+        assert.deepStrictEqual(await token.balanceOf(timeLock.address), BigNumber.from(0));
+        assert.deepStrictEqual(await token.name(), "BOSAGORA");
+        assert.deepStrictEqual(await token.symbol(), "BOA");
+        assert.deepStrictEqual(await token.decimals(), 7);
+    });
+
+    it("Fail mint initial supply", async () => {
+        assert.ok(multiSigWallet1);
+
+        const amount = BOAToken.make(1).value;
+        await expect(token.connect(account0).mint(multiSigWallet1.address, amount)).to.be.revertedWith(
+            "BOSAGORA: Only the owner can execute"
+        );
+    });
+
+    it("mint initial supply - proposal", async () => {
+        assert.ok(multiSigWallet1);
+        assert.ok(token);
+
+        const initialSupply = BOAToken.make(100_000_000).value;
+        const callData = token.interface.encodeFunctionData("mint", [multiSigWallet1.address, initialSupply]);
+        const mintEncoded = timeLock.interface.encodeFunctionData("schedule", [
+            token.address,
+            0,
+            callData,
+            ethers.constants.HashZero,
+            ethers.constants.HashZero,
+            minDelay,
+        ]);
+
+        const transactionId = await ContractUtils.getEventValueBigNumber(
+            await multiSigWallet1
+                .connect(account0)
+                .submitTransaction("Mint", "Mint 1 token", timeLock.address, 0, mintEncoded),
+            multiSigWallet1.interface,
+            "Submission",
+            "transactionId"
+        );
+        assert.ok(transactionId !== undefined);
+
+        const executedTransactionId = await ContractUtils.getEventValueBigNumber(
+            await multiSigWallet1.connect(account1).confirmTransaction(transactionId),
+            multiSigWallet1.interface,
+            "Execution",
+            "transactionId"
+        );
+        assert.ok(executedTransactionId !== undefined);
+
+        // Check that transaction has been executed
+        assert.deepStrictEqual(transactionId, executedTransactionId);
+
+        // Check balance of target
+        assert.deepStrictEqual(await token.balanceOf(multiSigWallet1.address), BigNumber.from(0));
+    });
+
+    it("increase time", async () => {
+        // 2. 시간 경과 시뮬레이션 (2일)
+        await ethers.provider.send("evm_increaseTime", [minDelay + 1]);
+        await ethers.provider.send("evm_mine", []);
+    });
+
+    it("mint initial supply - execution", async () => {
+        assert.ok(multiSigWallet1);
+        assert.ok(token);
+
+        const initialSupply = BOAToken.make(100_000_000).value;
+        const callData = token.interface.encodeFunctionData("mint", [multiSigWallet1.address, initialSupply]);
+        const mintEncoded = timeLock.interface.encodeFunctionData("execute", [
+            token.address,
+            0,
+            callData,
+            ethers.constants.HashZero,
+            ethers.constants.HashZero,
+        ]);
+
+        const transactionId = await ContractUtils.getEventValueBigNumber(
+            await multiSigWallet1
+                .connect(account0)
+                .submitTransaction("Mint", "Mint 1 token", timeLock.address, 0, mintEncoded),
+            multiSigWallet1.interface,
+            "Submission",
+            "transactionId"
+        );
+        assert.ok(transactionId !== undefined);
+
+        const executedTransactionId = await ContractUtils.getEventValueBigNumber(
+            await multiSigWallet1.connect(account1).confirmTransaction(transactionId),
+            multiSigWallet1.interface,
+            "Execution",
+            "transactionId"
+        );
+
+        // Check that transaction has been executed
+        assert.deepStrictEqual(transactionId, executedTransactionId);
+
+        // Check balance of target
+        assert.deepStrictEqual(await token.balanceOf(multiSigWallet1.address), initialSupply);
     });
 });
