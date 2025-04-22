@@ -55,6 +55,16 @@ contract MockERC20 is ERC20 {
         return ERC20.transfer(to, amount);
     }
 
+    /**
+     * @dev Override of the standard transferFrom function with error simulation.
+     * @param from The address to transfer tokens from
+     * @param to The address to transfer tokens to
+     * @param amount The amount of tokens to transfer
+     * @return bool indicating whether the transfer was successful
+     *
+     * If errorCausing is true, the function will revert with "Error for test".
+     * This is used to simulate transferFrom failures in test scenarios.
+     */
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
         if (errorCausing) revert("Error for test");
         return ERC20.transferFrom(from, to, amount);

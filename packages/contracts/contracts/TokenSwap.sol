@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
 
 /**
  * @title TokenSwap
@@ -25,27 +24,20 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     /// @dev The new token contract
     IERC20 public immutable newToken;
 
-    /// @dev The MultiSig wallet that owns the contract
+    /// @dev The address that owns the contract
     address public owner;
 
     /**
-     * @notice Emitted when old tokens are burned
-     * @param user The address of the user whose tokens were burned
-     * @param amount The amount of tokens that were burned
-     */
-    event OldTokenBurned(address indexed user, uint256 amount);
-
-    /**
-     * @notice Emitted when tokens are swapped
-     * @param user The address of the user who swapped tokens
-     * @param amount The amount of tokens that were swapped
+     * @notice Emitted when tokens are swapped successfully.
+     * @param user The address of the user who swapped tokens.
+     * @param amount The amount of tokens that were swapped.
      */
     event TokenSwapped(address indexed user, uint256 amount);
 
     /**
-     * @notice Emitted when ownership is transferred
-     * @param previousOwner The address of the previous owner
-     * @param newOwner The address of the new owner
+     * @notice Emitted when ownership is transferred.
+     * @param previousOwner The address of the previous owner.
+     * @param newOwner The address of the new owner.
      */
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -58,11 +50,12 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Contract constructor
-     * @param oldTokenAddress Address of the old token contract
-     * @param newTokenAddress Address of the new token contract
+     * @notice Contract constructor.
+     * @param oldTokenAddress Address of the old token contract.
+     * @param newTokenAddress Address of the new token contract.
      * @param initialOwner The initial address that will own the contract.
-     * @dev Validates token contracts and checks decimals compatibility
+     * @dev Validates token contracts and checks decimals compatibility.
+     * Does not check if initialOwner is a MultiSig wallet.
      */
     constructor(address oldTokenAddress, address newTokenAddress, address initialOwner) {
         require(oldTokenAddress != address(0), "TokenSwap: Old token is zero address");
@@ -95,6 +88,11 @@ contract TokenSwap is Pausable, ReentrancyGuard {
      * @notice Transfers ownership of the contract to a new owner account.
      * @param newOwner The address of the new owner.
      * @dev Only callable by the current owner.
+     * Does not require newOwner to be a MultiSig wallet.
+     * Requirements:
+     * - The caller must be the current owner.
+     * - `newOwner` cannot be the zero address.
+     * - `newOwner` cannot be the current owner.
      */
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "TokenSwap: New owner is zero address");
@@ -135,13 +133,11 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Swaps old tokens for new tokens
-     * @dev The function will:
-     * 1. Transfer old tokens from the user to this contract
-     * 2. Transfer new tokens to the user
-     * 3. Burn the old tokens
-     * If any step fails, the transaction will be reverted and old tokens returned
-     * @param amount The amount of tokens to swap
+     * @notice Swaps old tokens for new tokens.
+     * @dev Transfers `amount` of old tokens from `msg.sender` directly to the BURN_ADDRESS
+     * and transfers the same `amount` of new tokens from this contract to `msg.sender`.
+     * Reverts if any transfer fails or checks do not pass.
+     * @param amount The amount of tokens to swap.
      */
     function swap(uint256 amount) external whenNotPaused nonReentrant {
         // Gas optimization: Check zero amount first (cheap check)
@@ -168,11 +164,12 @@ contract TokenSwap is Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Emergency function to rescue tokens stuck in the contract
-     * @dev Only callable by the contract owner
-     * @param token The address of the token to rescue
-     * @param amount The amount of tokens to rescue
-     * @param to The address to send the rescued tokens to
+     * @notice Emergency function to rescue ERC20 tokens accidentally sent to this contract.
+     * @dev Only callable by the contract owner.
+     * Can rescue any ERC20 token, including oldToken and newToken if necessary in emergencies.
+     * @param token The address of the token to rescue.
+     * @param amount The amount of tokens to rescue.
+     * @param to The address to send the rescued tokens to.
      */
     function rescueTokens(address token, uint256 amount, address to) external onlyOwner nonReentrant {
         require(token != address(0), "TokenSwap: Token address is zero");

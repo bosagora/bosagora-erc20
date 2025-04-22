@@ -3,7 +3,6 @@
 pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
 
 /**
  * @title BOSAGORA Token
@@ -12,9 +11,8 @@ import "multisig-wallet-contracts/contracts/IMultiSigWallet.sol";
  * This contract implements the BOSAGORA token with the following features:
  * - Fixed maximum supply of 4.95 billion BOA tokens
  * - 7 decimal places
- * - MultiSig wallet ownership
- * - Controlled minting functionality
- * - Ownership transfer capability
+ * - Owner-controlled minting functionality
+ * - Transferable ownership
  */
 contract BOSAGORA is ERC20 {
     /*
@@ -28,10 +26,15 @@ contract BOSAGORA is ERC20 {
     /*
      *  Storage
      */
-    address public owner; // Address of the MultiSig wallet that owns the contract
+    address public owner; // Address of the account that owns the contract
 
     /*
      *  Events
+     */
+    /**
+     * @notice Emitted when tokens are created by the owner.
+     * @param account The account that received the minted tokens.
+     * @param amount The amount of tokens minted.
      */
     event TokensMinted(address indexed account, uint256 amount);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
