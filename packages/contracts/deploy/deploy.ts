@@ -4,7 +4,14 @@ import { ethers } from "hardhat";
 import { HardhatAccount } from "../src/HardhatAccount";
 import { BOAToken } from "../src/utils/Amount";
 import { ContractUtils } from "../src/utils/ContractUtils";
-import { BOSAGORA, MockERC20, MultiSigWallet, MultiSigWalletFactory, TokenSwap } from "../typechain-types";
+import {
+    BOSAGORA,
+    MockERC20,
+    MultiSigWallet,
+    MultiSigWalletFactory,
+    TimelockController,
+    TokenSwap,
+} from "../typechain-types";
 
 import fs from "fs";
 import { BaseContract, BigNumber, Wallet } from "ethers";
@@ -13,28 +20,28 @@ import { AddressZero } from "@ethersproject/constants";
 interface IChainInfo {
     multisigWalletFactoryAddress: string;
     multisigWalletAddress: string;
+    cancellerMultisigWalletAddress: string;
     swapSupply: BigNumber;
     additionalSupply: BigNumber;
     bridgeAddress: string;
     oldBOATokenAddress: string;
+    newBOATokenAddress: string;
+    tokenSwapAddress: string;
+    timelockControllerAddress: string;
 }
 
 export const CHAIN_INFORMATION: { [key: string]: IChainInfo } = {
-    1: {
-        multisigWalletFactoryAddress: AddressZero,
-        multisigWalletAddress: AddressZero,
-        swapSupply: BOAToken.make(450_000_000).value,
-        additionalSupply: BOAToken.make(450_000_000).value,
-        bridgeAddress: AddressZero,
-        oldBOATokenAddress: "0x746DdA2ea243400D5a63e0700F190aB79f06489e",
-    },
     24680: {
         multisigWalletFactoryAddress: AddressZero,
         multisigWalletAddress: AddressZero,
-        swapSupply: BOAToken.make(450_000_000).value,
-        additionalSupply: BOAToken.make(800_000_000).value,
-        bridgeAddress: "0xEC2F78F41fD1BfF65f9f6f6C60Be738719B18488",
+        cancellerMultisigWalletAddress: AddressZero,
+        swapSupply: BOAToken.make("450_000_000").value,
+        additionalSupply: BOAToken.make("1_076_755_093").value,
+        bridgeAddress: AddressZero, //"0xEC2F78F41fD1BfF65f9f6f6C60Be738719B18488",
         oldBOATokenAddress: AddressZero,
+        newBOATokenAddress: AddressZero,
+        tokenSwapAddress: AddressZero,
+        timelockControllerAddress: AddressZero,
     },
 };
 
@@ -47,7 +54,7 @@ interface IDeployedContract {
 interface IAccount {
     deployerMultisig: Wallet;
     deployer: Wallet;
-    tokenOwners: Wallet[];
+    tokenMembers: Wallet[];
 }
 
 type FnDeployer = (accounts: IAccount, deployment: Deployments) => Promise<any>;
@@ -57,7 +64,7 @@ class Deployments {
     public deployers: FnDeployer[];
     public accounts: IAccount;
     public chainId: number;
-
+    public minDelay = 10;
     public requiredMultiSigWallet: number = 2;
 
     constructor(chainId: number) {
@@ -73,7 +80,7 @@ class Deployments {
         this.accounts = {
             deployerMultisig,
             deployer,
-            tokenOwners: [tokenOwner1, tokenOwner2, tokenOwner3],
+            tokenMembers: [tokenOwner1, tokenOwner2, tokenOwner3],
         };
     }
 
@@ -165,7 +172,7 @@ async function deployMultiSigWallet(accounts: IAccount, deployment: Deployments)
             await factoryContract.connect(accounts.deployerMultisig).create(
                 "OwnerWallet",
                 "",
-                deployment.accounts.tokenOwners.map((m) => m.address),
+                deployment.accounts.tokenMembers.map((m) => m.address),
                 deployment.requiredMultiSigWallet,
                 1
             ),
@@ -178,7 +185,7 @@ async function deployMultiSigWallet(accounts: IAccount, deployment: Deployments)
 
             const owners = await contract.getMembers();
             for (let idx = 0; idx < owners.length; idx++) {
-                console.log(`MultiSigWallet's owners[${idx}]: ${owners[idx]}`);
+                console.log(`MultiSigWallet's members[${idx}]: ${owners[idx]}`);
             }
 
             deployment.addContract(contractName, contract.address, contract);
@@ -193,6 +200,206 @@ async function deployMultiSigWallet(accounts: IAccount, deployment: Deployments)
         deployment.addContract(contractName, contract.address, contract);
         console.log(`Attached ${contractName} to ${contract.address}`);
     }
+}
+
+async function deployCancellerMultiSigWallet(
+    accounts: IAccount,
+    deployment: Deployments
+): Promise<MultiSigWallet | undefined> {
+    const contractName = "CancellerMultiSigWallet";
+    if (CHAIN_INFORMATION[deployment.chainId].cancellerMultisigWalletAddress === AddressZero) {
+        console.log(`Deploy ${contractName}...`);
+        if (deployment.getContract("MultiSigWalletFactory") === undefined) {
+            console.error("Contract is not deployed!");
+            return;
+        }
+
+        const factoryContract = deployment.getContract("MultiSigWalletFactory") as MultiSigWalletFactory;
+        const address = await ContractUtils.getEventValueString(
+            await factoryContract.connect(accounts.deployerMultisig).create(
+                "Canceller",
+                "",
+                deployment.accounts.tokenMembers.map((m) => m.address),
+                deployment.requiredMultiSigWallet,
+                2
+            ),
+            factoryContract.interface,
+            "ContractInstantiation",
+            "wallet"
+        );
+        if (address !== undefined) {
+            const contract = (await ethers.getContractFactory("MultiSigWallet")).attach(address) as MultiSigWallet;
+
+            const owners = await contract.getMembers();
+            for (let idx = 0; idx < owners.length; idx++) {
+                console.log(`CancellerMultiSigWallet's members[${idx}]: ${owners[idx]}`);
+            }
+
+            deployment.addContract(contractName, contract.address, contract);
+            console.log(`Deployed ${contractName} to ${contract.address}`);
+        } else {
+            console.error(`Failed to deploy ${contractName}`);
+        }
+    } else {
+        console.log(`Attach ${contractName}...`);
+        const factory = await ethers.getContractFactory("MultiSigWallet");
+        const contract = factory.attach(CHAIN_INFORMATION[deployment.chainId].cancellerMultisigWalletAddress);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Attached ${contractName} to ${contract.address}`);
+    }
+}
+
+async function reportMultisigWallet(accounts: IAccount, deployment: Deployments) {
+    const factoryContract = deployment.getContract("MultiSigWalletFactory") as MultiSigWalletFactory;
+    const multisigWalletContract = deployment.getContract("MultiSigWallet") as MultiSigWallet;
+    console.log(`Contract Address`);
+    console.log(`MultiSigWalletFactory BOA: ${factoryContract.address}`);
+    console.log(`\nMultiSigWallet BOA: ${multisigWalletContract.address}`);
+
+    let name = await multisigWalletContract.name();
+    console.log("Contract name:", name);
+
+    let creator = await multisigWalletContract.creator();
+    console.log("Contract creator:", creator);
+
+    let required = await multisigWalletContract.getRequired();
+    console.log("Required confirmations:", required.toString());
+    // Get the list of members
+    console.log("Checking member list...");
+    let members = await multisigWalletContract.getMembers();
+    console.log("Total members:", members.length);
+    console.log("Member addresses:");
+    for (let i = 0; i < members.length; i++) {
+        const isOwner = await multisigWalletContract.isOwner(members[i]);
+        console.log(`${i + 1}. ${members[i]} (Active: ${isOwner})`);
+    }
+
+    const cancellerMultisigWalletContract = deployment.getContract("CancellerMultiSigWallet") as MultiSigWallet;
+    console.log(`\nCanceller      BOA: ${cancellerMultisigWalletContract.address}`);
+    name = await cancellerMultisigWalletContract.name();
+    console.log("Contract name:", name);
+    creator = await cancellerMultisigWalletContract.creator();
+    console.log("Contract creator:", creator);
+    required = await cancellerMultisigWalletContract.getRequired();
+    console.log("Required confirmations:", required.toString());
+    // Get the list of members
+    console.log("Checking member list...");
+    members = await cancellerMultisigWalletContract.getMembers();
+    console.log("Total members:", members.length);
+    console.log("Member addresses:");
+    for (let i = 0; i < members.length; i++) {
+        const isOwner = await cancellerMultisigWalletContract.isOwner(members[i]);
+        console.log(`${i + 1}. ${members[i]} (Active: ${isOwner})`);
+    }
+}
+
+async function deployTimelockController(accounts: IAccount, deployment: Deployments) {
+    const contractName = "TimelockController";
+    if (CHAIN_INFORMATION[deployment.chainId].timelockControllerAddress === AddressZero) {
+        if (deployment.getContract("MultiSigWallet") === undefined) {
+            console.error("MultiSigWallet is not deployed!");
+            return;
+        }
+        console.log(`Deploy ${contractName}...`);
+
+        const multiSigWalletContract = deployment.getContract("MultiSigWallet") as MultiSigWallet;
+        const cancellerContract = deployment.getContract("CancellerMultiSigWallet") as MultiSigWallet;
+
+        const factory = await ethers.getContractFactory("TimelockController");
+        const timelockController = (await factory
+            .connect(accounts.deployer)
+            .deploy(deployment.minDelay, [], [], accounts.deployer.address)) as TimelockController;
+        await timelockController.deployed();
+        await timelockController.deployTransaction.wait();
+        deployment.addContract(contractName, timelockController.address, timelockController);
+        console.log(`Deployed ${contractName} to ${timelockController.address}`);
+
+        // Get role hashes
+        const PROPOSER_ROLE = await timelockController.PROPOSER_ROLE();
+        const EXECUTOR_ROLE = await timelockController.EXECUTOR_ROLE();
+        const CANCELLER_ROLE = await timelockController.CANCELLER_ROLE(); // Added Canceller Role
+        const ADMIN_ROLE = await timelockController.TIMELOCK_ADMIN_ROLE(); // Correct role for admin
+
+        // Grant PROPOSER_ROLE to MultiSig Wallet
+        console.log(`Granting PROPOSER_ROLE to ${multiSigWalletContract.address}...`);
+        let tx = await timelockController.grantRole(PROPOSER_ROLE, multiSigWalletContract.address);
+        console.log(`  Transaction hash: ${tx.hash}`);
+        await tx.wait();
+        console.log(`PROPOSER_ROLE granted to ${multiSigWalletContract.address}.`);
+
+        // Grant EXECUTOR_ROLE to MultiSig Wallet
+        console.log(`Granting EXECUTOR_ROLE to ${multiSigWalletContract.address}...`);
+        tx = await timelockController.grantRole(EXECUTOR_ROLE, multiSigWalletContract.address);
+        console.log(`  Transaction hash: ${tx.hash}`);
+        await tx.wait();
+        console.log(`EXECUTOR_ROLE granted to ${multiSigWalletContract.address}.`);
+
+        // Grant CANCELLER_ROLE to MultiSig Wallet
+        console.log(`Granting CANCELLER_ROLE to ${cancellerContract.address}...`);
+        tx = await timelockController.grantRole(CANCELLER_ROLE, cancellerContract.address);
+        console.log(`  Transaction hash: ${tx.hash}`);
+        await tx.wait();
+        console.log(`CANCELLER_ROLE granted to ${cancellerContract.address}.`);
+
+        // Revoke ADMIN_ROLE to deployer
+        console.log(`Revoking ADMIN_ROLE to ${accounts.deployer.address}...`);
+        tx = await timelockController.revokeRole(ADMIN_ROLE, accounts.deployer.address);
+        console.log(`  Transaction hash: ${tx.hash}`);
+        await tx.wait();
+        console.log(`ADMIN_ROLE revoked to ${accounts.deployer.address}.`);
+    } else {
+        console.log(`Attach ${contractName}...`);
+        const factory = await ethers.getContractFactory("TimelockController");
+        const contract = factory.attach(CHAIN_INFORMATION[deployment.chainId].timelockControllerAddress);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Attached ${contractName} to ${contract.address}`);
+    }
+}
+
+async function reportRollOfTimelockController(accounts: IAccount, deployment: Deployments) {
+    if (deployment.getContract("MultiSigWallet") === undefined) {
+        console.error("MultiSigWallet is not deployed!");
+        return;
+    }
+    if (deployment.getContract("TimelockController") === undefined) {
+        console.error("TimelockController is not deployed!");
+        return;
+    }
+
+    const timelockController = deployment.getContract("TimelockController") as TimelockController;
+    const multiSigWallet = deployment.getContract("MultiSigWallet") as MultiSigWallet;
+
+    const PROPOSER_ROLE = await timelockController.PROPOSER_ROLE();
+    const EXECUTOR_ROLE = await timelockController.EXECUTOR_ROLE();
+    const CANCELLER_ROLE = await timelockController.CANCELLER_ROLE(); // Added Canceller Role
+    const ADMIN_ROLE = await timelockController.TIMELOCK_ADMIN_ROLE(); // Correct role for admin
+
+    console.log(`Report Roll of TimelockController`);
+    console.log(`For MultiSigWallet ${multiSigWallet.address}`);
+    console.log(`MultiSigWallet-ADMIN_ROLE: ${await timelockController.hasRole(ADMIN_ROLE, multiSigWallet.address)}`);
+    console.log(
+        `MultiSigWallet-PROPOSER_ROLE: ${await timelockController.hasRole(PROPOSER_ROLE, multiSigWallet.address)}`
+    );
+    console.log(
+        `MultiSigWallet-EXECUTOR_ROLE: ${await timelockController.hasRole(EXECUTOR_ROLE, multiSigWallet.address)}`
+    );
+    console.log(
+        `MultiSigWallet-CANCELLER_ROLE: ${await timelockController.hasRole(CANCELLER_ROLE, multiSigWallet.address)}`
+    );
+
+    const canceller = deployment.getContract("CancellerMultiSigWallet") as MultiSigWallet;
+    console.log(`For CancellerMultiSigWallet ${canceller.address}`);
+    console.log(`Canceller-ADMIN_ROLE: ${await timelockController.hasRole(ADMIN_ROLE, canceller.address)}`);
+    console.log(`Canceller-PROPOSER_ROLE: ${await timelockController.hasRole(PROPOSER_ROLE, canceller.address)}`);
+    console.log(`Canceller-EXECUTOR_ROLE: ${await timelockController.hasRole(EXECUTOR_ROLE, canceller.address)}`);
+    console.log(`Canceller-CANCELLER_ROLE: ${await timelockController.hasRole(CANCELLER_ROLE, canceller.address)}`);
+
+    const deployerAddress = accounts.deployer.address;
+    console.log(`For Deployer ${deployerAddress}`);
+    console.log(`Deployer-ADMIN_ROLE: ${await timelockController.hasRole(ADMIN_ROLE, deployerAddress)}`);
+    console.log(`Deployer-PROPOSER_ROLE: ${await timelockController.hasRole(PROPOSER_ROLE, deployerAddress)}`);
+    console.log(`Deployer-EXECUTOR_ROLE: ${await timelockController.hasRole(EXECUTOR_ROLE, deployerAddress)}`);
+    console.log(`Deployer-CANCELLER_ROLE: ${await timelockController.hasRole(CANCELLER_ROLE, deployerAddress)}`);
 }
 
 async function deployOldBOAToken(accounts: IAccount, deployment: Deployments) {
@@ -225,64 +432,66 @@ async function deployOldBOAToken(accounts: IAccount, deployment: Deployments) {
 
 async function deployNewBOAToken(accounts: IAccount, deployment: Deployments) {
     const contractName = "NewBOAToken";
-    console.log(`Deploy ${contractName}...`);
-    if (deployment.getContract("MultiSigWallet") === undefined) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
+    if (CHAIN_INFORMATION[deployment.chainId].newBOATokenAddress === AddressZero) {
+        console.log(`Deploy ${contractName}...`);
+        if (deployment.getContract("MultiSigWallet") === undefined) {
+            console.error("MultiSigWallet is not deployed!");
+            return;
+        }
+        const factory = await ethers.getContractFactory("BOSAGORA");
+        const contract = (await factory.connect(accounts.deployer).deploy(accounts.deployer.address)) as BOSAGORA;
+        await contract.deployed();
+        await contract.deployTransaction.wait();
+        const owner = await contract.owner();
+        const balance = await contract.balanceOf(owner);
+        console.log(`NewBOA token's owner: ${owner}`);
+        console.log(`NewBOA token's balance of owner: ${new BOAToken(balance).toDisplayString(true, 2)}`);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Deployed ${contractName} to ${contract.address}`);
+    } else {
+        console.log(`Attach ${contractName}...`);
+        const factory = await ethers.getContractFactory("BOSAGORA");
+        const contract = factory.attach(CHAIN_INFORMATION[deployment.chainId].newBOATokenAddress);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Attached ${contractName} to ${contract.address}`);
     }
-    const factory = await ethers.getContractFactory("BOSAGORA");
-    const contract = (await factory
-        .connect(accounts.deployer)
-        .deploy(deployment.getContractAddress("MultiSigWallet"))) as BOSAGORA;
-    await contract.deployed();
-    await contract.deployTransaction.wait();
-    const owner = await contract.owner();
-    const balance = await contract.balanceOf(owner);
-    console.log(`NewBOA token's owner: ${owner}`);
-    console.log(`NewBOA token's balance of owner: ${new BOAToken(balance).toDisplayString(true, 2)}`);
-    deployment.addContract(contractName, contract.address, contract);
-    console.log(`Deployed ${contractName} to ${contract.address}`);
 }
 
 async function deployTokenSwap(accounts: IAccount, deployment: Deployments) {
-    if (deployment.getContract("OldBOAToken") === undefined) {
-        console.error("OldBOAToken is not deployed!");
-        return;
-    }
-    if (deployment.getContract("NewBOAToken") === undefined) {
-        console.error("NewBOAToken is not deployed!");
-        return;
-    }
-    if (deployment.getContract("MultiSigWallet") === undefined) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
-    }
-
     const contractName = "TokenSwap";
-    console.log(`Deploy ${contractName}...`);
-    if (
-        deployment.getContract("OldBOAToken") === undefined ||
-        deployment.getContract("NewBOAToken") === undefined ||
-        deployment.getContract("MultiSigWallet") === undefined
-    ) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
-    }
+    if (CHAIN_INFORMATION[deployment.chainId].tokenSwapAddress === AddressZero) {
+        if (deployment.getContract("OldBOAToken") === undefined) {
+            console.error("OldBOAToken is not deployed!");
+            return;
+        }
+        if (deployment.getContract("NewBOAToken") === undefined) {
+            console.error("NewBOAToken is not deployed!");
+            return;
+        }
 
-    const factory = await ethers.getContractFactory("TokenSwap");
-    const contract = (await factory
-        .connect(accounts.deployer)
-        .deploy(
-            deployment.getContractAddress("OldBOAToken"),
-            deployment.getContractAddress("NewBOAToken"),
-            deployment.getContractAddress("MultiSigWallet")
-        )) as BOSAGORA;
-    await contract.deployed();
-    await contract.deployTransaction.wait();
-    const owner = await contract.owner();
-    console.log(`TokenSwap owner: ${owner}`);
-    deployment.addContract(contractName, contract.address, contract);
-    console.log(`Deployed ${contractName} to ${contract.address}`);
+        console.log(`Deploy ${contractName}...`);
+
+        const factory = await ethers.getContractFactory("TokenSwap");
+        const contract = (await factory
+            .connect(accounts.deployer)
+            .deploy(
+                deployment.getContractAddress("OldBOAToken"),
+                deployment.getContractAddress("NewBOAToken"),
+                accounts.deployer.address
+            )) as BOSAGORA;
+        await contract.deployed();
+        await contract.deployTransaction.wait();
+        const owner = await contract.owner();
+        console.log(`TokenSwap owner: ${owner}`);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Deployed ${contractName} to ${contract.address}`);
+    } else {
+        console.log(`Attach ${contractName}...`);
+        const factory = await ethers.getContractFactory("TokenSwap");
+        const contract = factory.attach(CHAIN_INFORMATION[deployment.chainId].tokenSwapAddress);
+        deployment.addContract(contractName, contract.address, contract);
+        console.log(`Attached ${contractName} to ${contract.address}`);
+    }
 }
 
 async function mintInitialSupplyToken(accounts: IAccount, deployment: Deployments) {
@@ -290,153 +499,142 @@ async function mintInitialSupplyToken(accounts: IAccount, deployment: Deployment
         console.error("NewBOAToken is not deployed!");
         return;
     }
-    if (deployment.getContract("MultiSigWallet") === undefined) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
-    }
-
     const totalSupply = CHAIN_INFORMATION[deployment.chainId].swapSupply.add(
         CHAIN_INFORMATION[deployment.chainId].additionalSupply
     );
 
     console.log(`Start Mint`);
     const contractName = "NewBOAToken";
-    const contract = deployment.getContract("NewBOAToken") as BOSAGORA;
+    const tokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
     const amount = new BOAToken(totalSupply);
-    const wallet = deployment.getContract("MultiSigWallet") as MultiSigWallet;
-    const encodedData = contract.interface.encodeFunctionData("mint", [wallet.address, amount.value]);
-    const transactionId = await ContractUtils.getEventValueBigNumber(
-        await wallet
-            .connect(accounts.tokenOwners[0])
-            .submitTransaction("Mint", `Mint ${amount.toDisplayString()}`, contract.address, 0, encodedData),
-        wallet.interface,
-        "Submission",
-        "transactionId"
+    const tx = await tokenContract.mint(accounts.deployer.address, amount.value);
+    console.log(`Mint new BOA (tx: ${tx.hash})...`);
+    await tx.wait();
+    console.log(
+        `Balance(New BOA), deployer: ${new BOAToken(
+            await tokenContract.balanceOf(accounts.deployer.address)
+        ).toDisplayString(true, 2)}`
     );
-
-    if (transactionId === undefined) {
-        console.error(`Failed to submit transaction for token mint`);
-    } else {
-        const executedTransactionId = await ContractUtils.getEventValueBigNumber(
-            await wallet.connect(accounts.tokenOwners[1]).confirmTransaction(transactionId),
-            wallet.interface,
-            "Execution",
-            "transactionId"
-        );
-
-        if (executedTransactionId === undefined || !transactionId.eq(executedTransactionId)) {
-            console.error(`Failed to confirm transaction for token mint`);
-        }
-    }
-
-    console.log(`Mint ${contractName} to ${wallet.address}`);
+    console.log(`Mint ${contractName} to ${accounts.deployer.address}`);
 }
 
-async function depositToTokenSwapContract(accounts: IAccount, deployment: Deployments) {
+async function transferToTokenSwapContract(accounts: IAccount, deployment: Deployments) {
+    if (deployment.getContract("NewBOAToken") === undefined) {
+        console.error("NewBOAToken is not deployed!");
+        return;
+    }
+    if (deployment.getContract("TokenSwap") === undefined) {
+        console.error("TokenSwap is not deployed!");
+        return;
+    }
+
+    console.log(`Start Distribute`);
+    const contractName = "NewBOAToken";
+    const tokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
+    const tokenSwapContract = deployment.getContract("TokenSwap") as TokenSwap;
+    {
+        const amount = new BOAToken(CHAIN_INFORMATION[deployment.chainId].swapSupply);
+        const tx = await tokenContract.connect(accounts.deployer).transfer(tokenSwapContract.address, amount.value);
+        console.log(`Transfer new BOA to TokenSwap (tx: ${tx.hash})...`);
+        await tx.wait();
+    }
+    console.log(
+        `Balance(New BOA), deployer: ${new BOAToken(
+            await tokenContract.balanceOf(accounts.deployer.address)
+        ).toDisplayString(true, 2)}`
+    );
+    console.log(`Distribute ${contractName}`);
+}
+
+async function transferToMultisigWalletContract(accounts: IAccount, deployment: Deployments) {
     if (deployment.getContract("NewBOAToken") === undefined) {
         console.error("NewBOAToken is not deployed!");
         return;
     }
     if (deployment.getContract("MultiSigWallet") === undefined) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
-    }
-    if (deployment.getContract("TokenSwap") === undefined) {
         console.error("MultiSigWallet is not deployed!");
         return;
     }
 
     console.log(`Start Distribute`);
     const contractName = "NewBOAToken";
-    const contract = deployment.getContract("NewBOAToken") as BOSAGORA;
+    const tokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
+    const multiSigWalletContract = deployment.getContract("MultiSigWallet") as MultiSigWallet;
     {
-        const amount = new BOAToken(CHAIN_INFORMATION[deployment.chainId].swapSupply);
-        const address: string = deployment.getContractAddress("TokenSwap") || AddressZero;
-        const encodedData = contract.interface.encodeFunctionData("transfer", [address, amount.value]);
-        const wallet = deployment.getContract("MultiSigWallet") as MultiSigWallet;
-        const transactionId = await ContractUtils.getEventValueBigNumber(
-            await wallet
-                .connect(accounts.tokenOwners[0])
-                .submitTransaction(
-                    "Transfer",
-                    `Transfer ${amount.toDisplayString()} to ${address}`,
-                    contract.address,
-                    0,
-                    encodedData
-                ),
-            wallet.interface,
-            "Submission",
-            "transactionId"
-        );
-
-        if (transactionId === undefined) {
-            console.error(`Failed to submit transaction for token transfer`);
-        } else {
-            const executedTransactionId = await ContractUtils.getEventValueBigNumber(
-                await wallet.connect(accounts.tokenOwners[1]).confirmTransaction(transactionId),
-                wallet.interface,
-                "Execution",
-                "transactionId"
-            );
-
-            if (executedTransactionId === undefined || !transactionId.eq(executedTransactionId)) {
-                console.error(`Failed to confirm transaction for token transfer`);
-            }
-        }
+        const balance = await tokenContract.balanceOf(accounts.deployer.address);
+        const tx = await tokenContract.connect(accounts.deployer).transfer(multiSigWalletContract.address, balance);
+        console.log(`Transfer new BOA to MultiSigWallet (tx: ${tx.hash})...`);
+        await tx.wait();
     }
-
+    console.log(
+        `Balance(New BOA), deployer: ${new BOAToken(
+            await tokenContract.balanceOf(accounts.deployer.address)
+        ).toDisplayString(true, 2)}`
+    );
     console.log(`Distribute ${contractName}`);
 }
 
-async function depositToBridgeContract(accounts: IAccount, deployment: Deployments) {
+async function transferToBridgeContract(accounts: IAccount, deployment: Deployments) {
     if (deployment.getContract("NewBOAToken") === undefined) {
         console.error("NewBOAToken is not deployed!");
         return;
     }
-    if (deployment.getContract("MultiSigWallet") === undefined) {
-        console.error("MultiSigWallet is not deployed!");
-        return;
-    }
 
     const contract = deployment.getContract("NewBOAToken") as BOSAGORA;
     {
-        const amount = new BOAToken(CHAIN_INFORMATION[deployment.chainId].additionalSupply);
         const address: string = CHAIN_INFORMATION[deployment.chainId].bridgeAddress;
         if (address !== AddressZero) {
             console.log(`Start Deposit to Bridge`);
-            const encodedData = contract.interface.encodeFunctionData("transfer", [address, amount.value]);
-            const wallet = deployment.getContract("MultiSigWallet") as MultiSigWallet;
-            const transactionId = await ContractUtils.getEventValueBigNumber(
-                await wallet
-                    .connect(accounts.tokenOwners[0])
-                    .submitTransaction(
-                        "Transfer",
-                        `Transfer ${amount.toDisplayString()} to ${address}`,
-                        contract.address,
-                        0,
-                        encodedData
-                    ),
-                wallet.interface,
-                "Submission",
-                "transactionId"
-            );
 
-            if (transactionId === undefined) {
-                console.error(`Failed to submit transaction for token transfer`);
-            } else {
-                const executedTransactionId = await ContractUtils.getEventValueBigNumber(
-                    await wallet.connect(accounts.tokenOwners[1]).confirmTransaction(transactionId),
-                    wallet.interface,
-                    "Execution",
-                    "transactionId"
-                );
+            const amount = new BOAToken(CHAIN_INFORMATION[deployment.chainId].additionalSupply);
+            const tx = await contract.connect(accounts.deployer).transfer(address, amount.value);
+            console.log(`Transfer new BOA to Bridge (tx: ${tx.hash})...`);
+            await tx.wait();
 
-                if (executedTransactionId === undefined || !transactionId.eq(executedTransactionId)) {
-                    console.error(`Failed to confirm transaction for token transfer`);
-                }
-            }
             console.log(`Stop Deposit to Bridge`);
         }
+    }
+}
+
+async function transferOwnershipOfToken(accounts: IAccount, deployment: Deployments) {
+    if (deployment.getContract("NewBOAToken") === undefined) {
+        console.error("NewBOAToken is not deployed!");
+        return;
+    }
+
+    if (deployment.getContract("TimelockController") === undefined) {
+        console.error("TimelockController is not deployed!");
+        return;
+    }
+    const tokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
+    const timelockControllerContract = deployment.getContract("TimelockController") as TimelockController;
+    const owner = await tokenContract.owner();
+    if (owner !== timelockControllerContract.address) {
+        const tx = await tokenContract.connect(accounts.deployer).transferOwnership(timelockControllerContract.address);
+        console.log(`Transfer ownership of Token contract to TimelockControllerContract (tx: ${tx.hash})...`);
+        await tx.wait();
+    }
+}
+
+async function transferOwnershipOfTokenSwap(accounts: IAccount, deployment: Deployments) {
+    if (deployment.getContract("TokenSwap") === undefined) {
+        console.error("TokenSwap is not deployed!");
+        return;
+    }
+
+    if (deployment.getContract("TimelockController") === undefined) {
+        console.error("TimelockController is not deployed!");
+        return;
+    }
+    const tokenSwapContract = deployment.getContract("TokenSwap") as BOSAGORA;
+    const timelockControllerContract = deployment.getContract("TimelockController") as TimelockController;
+    const owner = await tokenSwapContract.owner();
+    if (owner !== timelockControllerContract.address) {
+        const tx = await tokenSwapContract
+            .connect(accounts.deployer)
+            .transferOwnership(timelockControllerContract.address);
+        console.log(`Transfer ownership of TokenSwap contract to TimelockController  (tx: ${tx.hash})...`);
+        await tx.wait();
     }
 }
 
@@ -457,18 +655,33 @@ async function report(accounts: IAccount, deployment: Deployments) {
         console.error("MultiSigWallet is not deployed!");
         return;
     }
+    if (deployment.getContract("TimelockController") === undefined) {
+        console.error("TimelockController is not deployed!");
+        return;
+    }
 
     const oldBOATokenContract = deployment.getContract("OldBOAToken") as MockERC20;
     const newBOATokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
     const TokenSwapContract = deployment.getContract("TokenSwap") as TokenSwap;
     const MultiSigWalletContract = deployment.getContract("MultiSigWallet") as MultiSigWallet;
+    const CancellerContract = deployment.getContract("CancellerMultiSigWallet") as MultiSigWallet;
+    const timelockController = deployment.getContract("TimelockController") as TimelockController;
 
-    console.log(`Address`);
+    console.log(`Report`);
+    console.log(`1. Addresses`);
     console.log(`Old BOA: ${oldBOATokenContract.address}`);
     console.log(`New BOA: ${newBOATokenContract.address}`);
     console.log(`Token Swap: ${TokenSwapContract.address}`);
+    console.log(`TimelockController: ${timelockController.address}`);
+    console.log(`MSWallet: ${MultiSigWalletContract.address}`);
+    console.log(`Canceller: ${CancellerContract.address}`);
+    console.log(`Deployer: ${accounts.deployer.address}`);
 
-    const balance1 = await oldBOATokenContract.balanceOf(accounts.deployer.address);
+    console.log(`2. Owners`);
+    console.log(`Owner - Token Swap: ${await TokenSwapContract.owner()}`);
+    console.log(`Owner - New BOA: ${await newBOATokenContract.owner()}`);
+
+    console.log(`3. Balances`);
     console.log(
         `Balance(Old BOA), deployer: ${new BOAToken(
             await oldBOATokenContract.balanceOf(accounts.deployer.address)
@@ -514,16 +727,24 @@ async function main() {
 
     deployments.addDeployer(deployMultiSigWalletFactory);
     deployments.addDeployer(deployMultiSigWallet);
+    deployments.addDeployer(deployCancellerMultiSigWallet);
+
+    deployments.addDeployer(reportMultisigWallet);
     deployments.addDeployer(deployOldBOAToken);
     deployments.addDeployer(deployNewBOAToken);
     deployments.addDeployer(deployTokenSwap);
+    deployments.addDeployer(deployTimelockController);
     deployments.addDeployer(mintInitialSupplyToken);
-    deployments.addDeployer(depositToTokenSwapContract);
-    deployments.addDeployer(depositToBridgeContract);
+    deployments.addDeployer(transferToTokenSwapContract);
+    deployments.addDeployer(transferToBridgeContract);
+    deployments.addDeployer(transferToMultisigWalletContract);
+    deployments.addDeployer(transferOwnershipOfToken);
+    deployments.addDeployer(transferOwnershipOfTokenSwap);
+
     deployments.addDeployer(report);
+    deployments.addDeployer(reportRollOfTimelockController);
 
     await deployments.doDeploy();
-
     deployments.saveContractInfo();
 }
 

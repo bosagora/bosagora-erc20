@@ -41,6 +41,12 @@ export class ContractUtils {
         return Math.floor(new Date().getTime() / 1000);
     }
 
+    public static delay(interval: number): Promise<void> {
+        return new Promise<void>((resolve, _) => {
+            setTimeout(resolve, interval);
+        });
+    }
+
     public static findLog(receipt: ContractReceipt, iface: Interface, eventName: string): Log | undefined {
         return receipt.logs.find((log) => log.topics[0] === id(iface.getEvent(eventName).format("sighash")));
     }
