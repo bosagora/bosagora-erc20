@@ -206,17 +206,23 @@ async function mintInitialSupplyToken(accounts: IAccount, deployment: Deployment
         console.error("NewBOAToken is not deployed!");
         return;
     }
-    const totalSupply = CHAIN_INFORMATION[deployment.chainId].swapSupply.add(
-        CHAIN_INFORMATION[deployment.chainId].additionalSupply
-    );
 
     console.log(`Start Mint`);
     const contractName = "NewBOAToken";
     const tokenContract = deployment.getContract("NewBOAToken") as BOSAGORA;
-    const amount = new BOAToken(totalSupply);
-    const tx = await tokenContract.mint(amount.value);
-    console.log(`Mint new BOA (tx: ${tx.hash})...`);
-    await tx.wait();
+
+    const tx1 = await tokenContract.mint();
+    console.log(`Mint new BOA year 2022 (tx: ${tx1.hash})...`);
+    await tx1.wait();
+
+    const tx2 = await tokenContract.mint();
+    console.log(`Mint new BOA year 2023 (tx: ${tx2.hash})...`);
+    await tx2.wait();
+
+    const tx3 = await tokenContract.mint();
+    console.log(`Mint new BOA year 2024 (tx: ${tx3.hash})...`);
+    await tx3.wait();
+
     console.log(
         `Balance(New BOA), deployer: ${new BOAToken(
             await tokenContract.balanceOf(accounts.deployer.address)
