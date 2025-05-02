@@ -17,8 +17,7 @@
         "formatting:check": "prettier '**/*.{json,sol,ts,js,md}' -c",
         "formatting:write": "prettier '**/*.{json,sol,ts,js,md}' --write",
         "test:BOSAGORA": "hardhat test test/BOSAGORA.test.ts",
-        "test:TokenSwap": "hardhat test test/TokenSwap.test.ts",
-        "test:TimeLock": "hardhat test test/TimeLock.test.ts"
+        "test:TokenSwap": "hardhat test test/TokenSwap.test.ts"
     },
     "repository": {
         "type": "git",
@@ -32,6 +31,7 @@
     "homepage": "https://github.com/bosagora/bosagora-erc20#readme",
     "devDependencies": {
         "@ethersproject/constants": "^5.7.0",
+        "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
         "@nomiclabs/hardhat-ethers": "^2.2.3",
         "@nomiclabs/hardhat-waffle": "^2.0.2",
         "@typechain/ethers-v5": "^10.1.0",
