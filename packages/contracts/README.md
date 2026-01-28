@@ -87,8 +87,39 @@ npx hardhat compile
 
 ## Contract Addresses
 
--   BOSAGORA Token: [Address to be added]
--   TokenSwap Contract: [Address to be added]
+-   BOSAGORA Token: [0xc65A680ed408Ff0987a4f751F1999c96dB597482]
+-   TokenSwap Contract: [0xB96E55C18Dd7578Af2726F87627c8aDe4088E52d]
+
+## Audit Report
+
+Latest audit report: `audit/REP-final-20250514T025615Z.pdf`
+
+## Security Audit
+
+**Auditor:** CertiK  
+**Audit Date:** May 13, 2025  
+**Report Status:** ✅ All Findings Resolved
+
+### Audit Summary
+
+Assessment covered Formal Verification, Manual Review, and Static Analysis. The BOSAGORA Token contract had **0 Critical** and **0 Major** issues.
+
+| Category           | Count | Status             |
+| :----------------- | :---: | :----------------- |
+| **Critical**       | **0** | -                  |
+| **Major**          | **0** | -                  |
+| Medium             |   0   | -                  |
+| Minor              |   3   | ✅ Resolved        |
+| Centralization     |   2   | ✅ Removed (Fixed) |
+| **Total Findings** | **5** | **All Resolved**   |
+
+### Key Security Improvements
+
+-   **Decentralization:** Removed privileged accounts and ownership controls to keep the contracts permissionless.
+-   **Token Distribution:** Added a clear 128-year schedule and enforced Multi-Signature control.
+-   **Compatibility:** Retested ERC20 compliance to ensure smooth integration with exchanges and DeFi protocols.
+
+> See the full report in `audit/REP-final-20250514T025615Z.pdf`.
 
 ## License
 

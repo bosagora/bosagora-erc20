@@ -59,6 +59,35 @@ All contracts implement the following security measures:
 - Clear error messages and rollback capabilities
 - Gas-optimized implementation
 
+## Audit Report
+
+The latest security audit is available at `packages/contracts/audit/REP-final-20250514T025615Z.pdf`.
+
+## Security Audit
+
+**Auditor:** CertiK  
+**Audit Date:** May 13, 2025  
+**Report Status:** ✅ All Findings Resolved
+
+### Audit Summary
+The BOSAGORA Token contract was assessed through Formal Verification, Manual Review, and Static Analysis. The report confirmed **0 Critical** and **0 Major** findings across the audited surface.
+
+| Category | Count | Status |
+| :--- | :---: | :--- |
+| **Critical** | **0** | - |
+| **Major** | **0** | - |
+| Medium | 0 | - |
+| Minor | 3 | ✅ Resolved |
+| Centralization | 2 | ✅ Removed (Fixed) |
+| **Total Findings** | **5** | **All Resolved** |
+
+### Key Security Improvements
+* **Decentralization:** Removed privileged accounts, ownership controls, and administrative functions to preserve a permissionless design.
+* **Token Distribution:** Added a clear 128-year distribution schedule and Multi-Signature Wallet controls to remove single points of failure.
+* **Compatibility:** Re-verified ERC20 compliance to ensure interoperability with exchanges and DeFi tooling.
+
+> For more details, please refer to the full audit report.
+
 ## Technical Details
 
 ### Dependencies
@@ -106,12 +135,12 @@ npx hardhat compile
 ## Contract Addresses
 
 ### Mainnet
-- BOSAGORA Token: [Address to be added]
-- TokenSwap Contract: [Address to be added]
+- BOSAGORA Token: [0xc65A680ed408Ff0987a4f751F1999c96dB597482]
+- TokenSwap Contract: [0xB96E55C18Dd7578Af2726F87627c8aDe4088E52d]
 
 ### Testnet
-- BOSAGORA Token: [Address to be added]
-- TokenSwap Contract: [Address to be added]
+- BOSAGORA Token: [0x0195a6DD3Aa109567bb38958D48a86b3A08BC48b]
+- TokenSwap Contract: [0x84ED8636b5F613fb30D6906320302467686fEDEE]
 
 ## License
 
